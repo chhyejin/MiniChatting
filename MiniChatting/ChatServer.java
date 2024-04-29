@@ -15,10 +15,6 @@ import java.util.Set;
 
 public class ChatServer {
     private static final int PORT = 12345;
-    private static int roomNumber = 1;
-    private static Map<Integer, ChatRoom> chatRooms = new HashMap<>(); //채팅방
-    private static Map<String, Integer> userInRoom = new HashMap<>(); //방과 사용자
-
     public static void main(String[] args) {
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             Set<String> manage = new HashSet<>();

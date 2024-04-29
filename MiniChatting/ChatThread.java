@@ -21,7 +21,8 @@ public class ChatThread extends Thread {
     private Set<String> userManage = new HashSet<>(); //사용자 관리
     private static int roomNumber = 1;
     private static Map<Integer, ChatRoom> chatRooms = new HashMap<>(); //채팅방
-    private static Map<String, Integer> userInRoom = new HashMap<>(); //방과 사용자
+    private static Map<String, Integer> userInRoom = new HashMap<>(); //방과 사용자 현재 채팅방 목록을
+    private static Set<String> disturb= new HashSet<>(); //방해금지 모드에 해당하는 사람
 
     public ChatThread(Socket socket, Set<String> userManage) {
         this.socket = socket;
@@ -35,7 +36,7 @@ public class ChatThread extends Thread {
             reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             while (true) {
                 userName = reader.readLine(); //닉네임을 읽어
-                if (!userManage.contains(userName)) {
+                if (!userManage.contains(userName)) { //닉네임 같은게 없다면 닉네임 중복 확인 부분
                     writer.println("VALID");
                     userManage.add(userName);
 //                        sendMessageToClient("manage"+Usermanage); //이름 관리 set 확인
@@ -46,7 +47,7 @@ public class ChatThread extends Thread {
                     sendMessageToClient("성공적으로 서버와 연결되었습니다.");
                     break;
                 } else {
-                    writer.println("UNVALID");
+                    writer.println("UNVALID"); //닉네임 중복 처리
                 }
             }
             String message;
@@ -94,13 +95,19 @@ public class ChatThread extends Thread {
                 case "/roomusers":
                     showRoomUser(userName);
                     break;
+                case "/whisper":
+                    whisper(message);
+                    break;
+                case "/nodisturb":
+                    doNotDisturb();
+                    break;
+                case "/dodisturb":
+                    doDisturb();
+                    break;
                 case "/bye":
                     sendMessageToClient("서버와의 연결이 해제 되었습니다.");
                     userManage.remove(userName);
                     writer.println("/bye");
-                    break;
-                case "/whisper":
-                    whisper(message);
                     break;
                 default:
                     sendMessageToClient("잘못 입력하셨습니다.");
@@ -114,15 +121,18 @@ public class ChatThread extends Thread {
         }
     }
 
-    private void sendMessageToClient(String message) {
+    private void sendMessageToClient(String message) { //그냥 노멀한 메시지
         writer.println(message);
     }
 
-    void sendMessage(String sender, String message) {
-        writer.println(sender + " : " + message);
+    void sendMessage(String sender, String message) { //사용자 이름과 함께 메시지
+        if (disturb.contains(userName)) {
+            return;
+        }
+        writer.println(sender+" : "+message);
     }
 
-    private void showRoomList() {
+    private void showRoomList() { //채팅방 리스트 출력
         if (chatRooms.isEmpty()) {
             sendMessageToClient("현재 생성된 채팅방이 없습니다.");
         } else {
@@ -145,26 +155,28 @@ public class ChatThread extends Thread {
         }
     }
 
-    public void showRoomUser(String userName) { //채팅방에 있는 사람들 출력
+    public void showRoomUser(String userName) { //해당 채팅방에 있는 사람들 출력
 
         int foundValue = 0;
         for (Map.Entry<String, Integer> integerStringEntry : userInRoom.entrySet()) {
             System.out.println(integerStringEntry);
             if (integerStringEntry.getKey().equals(userName)) {
                 foundValue = integerStringEntry.getValue();
-                System.out.println(foundValue);
+                System.out.println(foundValue); //서버에 이름 : 채팅방
                 break;
             }
         }
         for (Map.Entry<String, Integer> entry : userInRoom.entrySet()) {
             if (entry.getValue() == foundValue) {
                 sendMessageToClient("현재 채팅방의 접속자 " + entry.getKey());
+            }else{
+                sendMessageToClient("현재 접속 중인 채팅방이 없습니다.");
             }
         }
     }
 
-    private void whisper(String message) {
-        String[] parts = message.split(" ", 3); // 최대 3개의 파트로 나눔: "/whisper", 대상 닉네임, 메시지
+    private void whisper(String message) { //귓속말
+        String[] parts = message.split(" ", 3);
         if (parts.length != 3) {
             sendMessageToClient("사용법: /whisper [보낼 대상 닉네임] [메시지]");
             return;
@@ -173,8 +185,7 @@ public class ChatThread extends Thread {
         String targetUsername = parts[1];
         String whisperMessage = parts[2];
 
-        // 대상 닉네임의 클라이언트를 찾아 메시지 전송
-        ChatThread targetClient = findClientByUsername(targetUsername);
+        ChatThread targetClient = findClientByUsername(targetUsername);//해당 대상 클라이언트에 메시지 전송
         if (targetClient != null) {
             targetClient.sendMessageToClient("[귓속말 전송] " + userName + ": " + whisperMessage);
             sendMessageToClient("귓속말을 전송했습니다.");
@@ -183,8 +194,7 @@ public class ChatThread extends Thread {
         }
     }
 
-    // 사용자 이름에 해당하는 클라이언트를 찾는 메서드
-    private ChatThread findClientByUsername(String username) {
+    private ChatThread findClientByUsername(String username) {// 사용자 이름에 해당하는 클라이언트 찾기
         for (Thread t : Thread.getAllStackTraces().keySet()) {
             if (t instanceof ChatThread) {
                 ChatThread client = (ChatThread) t;
@@ -196,7 +206,7 @@ public class ChatThread extends Thread {
         return null;
     }
 
-    private void createRoom() {
+    private void createRoom() { //채팅방 생성
         int roomId = roomNumber++;
         ChatRoom room = new ChatRoom(roomId);
         chatRooms.put(roomId, room);
@@ -204,7 +214,7 @@ public class ChatThread extends Thread {
         sendMessageToClient("방 번호 " + roomId + " 가 생성되었습니다.");
     }
 
-    private void joinRoom(int roomId) {
+    private void joinRoom(int roomId) { //채팅방 입장
         if (chatRooms.containsKey(roomId)) {
             if (currentRoom != null) {
                 currentRoom.removeClient(this);
@@ -219,10 +229,23 @@ public class ChatThread extends Thread {
         }
     }
 
-    private void exitRoom() {
+    private void doNotDisturb() { //방해금지 모드
+        sendMessageToClient("방해금지 모드를 활성화 했습니다.");
+        sendMessageToClient(userName + " 님께서 방해금지 모드를 활성화 했습니다.");
+        disturb.add(userName);
+    }
+
+    private void doDisturb() { //방해금지 해제
+        sendMessageToClient("방해금지 모드를 해제했습니다.");
+        sendMessageToClient(userName + " 님께서 방해금지 모드를 해제 했습니다.");
+        disturb.remove(userName);
+    }
+
+    private void exitRoom() { //채팅방 나가기
         if (currentRoom != null) {
             currentRoom.removeClient(this);
             sendMessageToClient(userName + "님이 이 방을 나갔습니다.");
+            userInRoom.remove(userName); //사용자 제거 현재 채팅방 목록에서
             if (currentRoom.clients.isEmpty()) {
                 chatRooms.remove(currentRoom.getId()); //방 번호 제거
                 //                    userInRoom.remove(currentRoom.getId()); //유저

@@ -34,7 +34,9 @@ public class ChatClient {
                     System.out.println("이미 존재하는 닉네임입니다. 다른 닉네임을 입력하세요.");
                 }
             }
-            System.out.println("방 목록 보기: /list\n방 생성: /create\n방 입장: /join [방 번호 1번부터 시작]\n방 나가기: /exit\n현재 접속 중인 사람들 출력: /users\n귓속말: /whisper [보낼 대상] [메시지]\n현재 해당 채팅방에 접속된 사람들 출력: /roomusers\n접속 종료: /bye");
+            //방해금지 모드 추가하고 싶음
+            System.out.println("방 목록 보기: /list\n방 생성: /create\n방 입장: /join [방 번호 1번부터 시작]\n방 나가기: /exit\n현재 접속 중인 사람들 출력: /users");
+            System.out.println("귓속말: /whisper [보낼 대상] [메시지]\n현재 해당 채팅방에 접속된 사람들 출력: /roomusers\n방해금지 모드: /nodisturb\n방해금지 모드 해제:/dodisturb\n접속 종료: /bye");
             //서버로부터 메시지를 읽어 화면에 출력하는 별도의 스레드
             Thread readThread = new Thread(new ServerMsg(in)); //각 각 스레드 만듦
             readThread.start(); //메시지 읽기 스레드 시작
